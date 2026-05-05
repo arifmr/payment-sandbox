@@ -20,7 +20,6 @@ Implementasi backend untuk *Payment Sandbox App* (lihat `soal.txt`) — Golang +
 - **Strategy + Factory** untuk metode pembayaran (WALLET / VA_DUMMY / EWALLET_DUMMY)
 - **Optimistic Locking** pada wallet (`version` column) + guard `balance + delta >= 0` untuk debit
 - **Middleware Chain**: request-id → recovery → logger → error mapper → auth → role
-- **DTO + Mapper** untuk pisahkan wire format dari entity domain
 
 ## Folder Structure
 
@@ -28,8 +27,8 @@ Implementasi backend untuk *Payment Sandbox App* (lihat `soal.txt`) — Golang +
 cmd/api/                # entrypoint, DI wiring, graceful shutdown, expiry sweeper
 internal/
   config/               # env loader
-  domain/               # entitas: User, Wallet, Topup, Invoice, PaymentIntent, Refund
-  dto/                  # request/response + mappers
+  constant/             # constant list
+  model/                # struct list
   handler/              # gin handlers + router
   service/              # business logic + payment strategies
   repository/           # interfaces + GORM impl + dashboard aggregator

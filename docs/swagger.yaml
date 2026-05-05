@@ -1,0 +1,1047 @@
+basePath: /api/v1
+definitions:
+  dto.CreateInvoiceRequest:
+    properties:
+      amount:
+        type: integer
+      customer_email:
+        maxLength: 255
+        type: string
+      customer_name:
+        maxLength: 255
+        minLength: 1
+        type: string
+      description:
+        maxLength: 500
+        type: string
+      due_date:
+        type: string
+    required:
+    - amount
+    - customer_name
+    - due_date
+    type: object
+  dto.CreatePaymentRequest:
+    properties:
+      method:
+        enum:
+        - WALLET
+        - VA_DUMMY
+        - EWALLET_DUMMY
+        type: string
+    required:
+    - method
+    type: object
+  dto.ErrorBody:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  dto.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/dto.ErrorBody'
+    type: object
+  dto.InvoiceResponse:
+    properties:
+      amount:
+        type: integer
+      created_at:
+        type: string
+      customer_email:
+        type: string
+      customer_name:
+        type: string
+      description:
+        type: string
+      due_date:
+        type: string
+      id:
+        type: string
+      invoice_number:
+        type: string
+      merchant_id:
+        type: string
+      paid_at:
+        type: string
+      payment_link:
+        type: string
+      payment_token:
+        type: string
+      status:
+        type: string
+    type: object
+  dto.LoginRequest:
+    properties:
+      email:
+        example: toko@example.com
+        type: string
+      password:
+        example: password123
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  dto.LoginResponse:
+    properties:
+      access_expires_at:
+        type: string
+      access_token:
+        type: string
+      refresh_expires_at:
+        type: string
+      refresh_token:
+        type: string
+      user:
+        $ref: '#/definitions/dto.UserResponse'
+    type: object
+  dto.LogoutRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  dto.PaymentActionRequest:
+    properties:
+      action:
+        enum:
+        - SUCCESS
+        - FAILED
+        type: string
+    required:
+    - action
+    type: object
+  dto.PaymentIntentResponse:
+    properties:
+      amount:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: string
+      invoice_id:
+        type: string
+      method:
+        type: string
+      processed_at:
+        type: string
+      status:
+        type: string
+    type: object
+  dto.PublicInvoiceResponse:
+    properties:
+      amount:
+        type: integer
+      customer_name:
+        type: string
+      description:
+        type: string
+      due_date:
+        type: string
+      invoice_number:
+        type: string
+      merchant_name:
+        type: string
+      status:
+        type: string
+    type: object
+  dto.RefreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  dto.RefundActionRequest:
+    properties:
+      action:
+        description: APPROVE | REJECT (when status REQUESTED), PROCESS | FAIL (when
+          status APPROVED)
+        enum:
+        - APPROVE
+        - REJECT
+        - PROCESS
+        - FAIL
+        type: string
+    required:
+    - action
+    type: object
+  dto.RefundResponse:
+    properties:
+      amount:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: string
+      invoice_id:
+        type: string
+      merchant_id:
+        type: string
+      payment_intent_id:
+        type: string
+      processed_at:
+        type: string
+      reason:
+        type: string
+      status:
+        type: string
+    type: object
+  dto.RegisterRequest:
+    properties:
+      email:
+        example: toko@example.com
+        type: string
+      name:
+        example: Toko A
+        maxLength: 100
+        minLength: 2
+        type: string
+      password:
+        example: password123
+        maxLength: 72
+        minLength: 8
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  dto.RequestRefundRequest:
+    properties:
+      amount:
+        type: integer
+      invoice_id:
+        type: string
+      reason:
+        maxLength: 500
+        type: string
+    required:
+    - amount
+    - invoice_id
+    type: object
+  dto.TopupActionRequest:
+    properties:
+      action:
+        enum:
+        - SUCCESS
+        - FAILED
+        type: string
+    required:
+    - action
+    type: object
+  dto.TopupRequest:
+    properties:
+      amount:
+        type: integer
+    required:
+    - amount
+    type: object
+  dto.TopupResponse:
+    properties:
+      amount:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: string
+      merchant_id:
+        type: string
+      processed_at:
+        type: string
+      status:
+        type: string
+    type: object
+  dto.UserResponse:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      role:
+        type: string
+    type: object
+  dto.WalletResponse:
+    properties:
+      balance:
+        type: integer
+      merchant_id:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  pagination.Meta:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  pagination.Response:
+    properties:
+      data: {}
+      pagination:
+        $ref: '#/definitions/pagination.Meta'
+    type: object
+  repository.DashboardStats:
+    properties:
+      total_amount_paid:
+        type: integer
+      total_amount_refund:
+        type: integer
+      total_expired:
+        type: integer
+      total_failed:
+        type: integer
+      total_invoices:
+        type: integer
+      total_paid:
+        type: integer
+    type: object
+info:
+  contact: {}
+  description: Payment Sandbox simulation API (invoice, payment intent, refund, wallet).
+  title: Payment Sandbox API
+  version: "1.0"
+paths:
+  /admin/dashboard:
+    get:
+      description: 'Aggregates: total invoices, paid/failed/expired counts, total
+        amount paid, total refund amount. Filterable by merchant and date range.'
+      parameters:
+      - description: filter by merchant uuid
+        in: query
+        name: merchant_id
+        type: string
+      - description: RFC3339 timestamp lower bound
+        in: query
+        name: from
+        type: string
+      - description: RFC3339 timestamp upper bound
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repository.DashboardStats'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: '[Admin] Dashboard statistics'
+      tags:
+      - admin
+  /admin/payments/{id}:
+    patch:
+      consumes:
+      - application/json
+      description: Transitions PENDING -> SUCCESS or FAILED. On SUCCESS, the invoice
+        becomes PAID and wallet side-effects are applied atomically.
+      parameters:
+      - description: payment intent id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: action
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.PaymentActionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PaymentIntentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: '[Admin] Finalize a payment intent'
+      tags:
+      - admin
+  /admin/refunds:
+    get:
+      parameters:
+      - description: page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: page size (default 20)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/pagination.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.RefundResponse'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: '[Admin] List all refunds'
+      tags:
+      - admin
+  /admin/refunds/{id}:
+    patch:
+      consumes:
+      - application/json
+      description: |-
+        Single endpoint that drives the refund state machine via body action.
+        REQUESTED -> APPROVE/REJECT, APPROVED -> PROCESS (SUCCESS, debits merchant wallet) / FAIL.
+      parameters:
+      - description: refund id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 'action: APPROVE|REJECT|PROCESS|FAIL'
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RefundActionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.RefundResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: '[Admin] Refund state machine action'
+      tags:
+      - admin
+  /admin/topups:
+    get:
+      parameters:
+      - description: filter by merchant uuid
+        in: query
+        name: merchant_id
+        type: string
+      - description: page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: page size (default 20)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/pagination.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.TopupResponse'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: '[Admin] List all top-ups'
+      tags:
+      - admin
+  /admin/topups/{id}:
+    patch:
+      consumes:
+      - application/json
+      description: Transitions PENDING -> SUCCESS or FAILED. On SUCCESS, credits the
+        merchant wallet atomically.
+      parameters:
+      - description: topup id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: action
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.TopupActionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TopupResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: '[Admin] Finalize a top-up'
+      tags:
+      - admin
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Returns a short-lived access JWT and an opaque refresh token.
+      parameters:
+      - description: credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Login
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Revokes the supplied refresh token. Idempotent.
+      parameters:
+      - description: refresh token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LogoutRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Logout
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: 'Rotates the refresh token: the supplied one is revoked, a new
+        pair is returned.'
+      parameters:
+      - description: refresh token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Refresh tokens
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Create a new merchant account. A wallet with zero balance is created
+        automatically.
+      parameters:
+      - description: registration payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Register merchant
+      tags:
+      - auth
+  /invoices:
+    get:
+      parameters:
+      - description: filter by status (PENDING/PAID/EXPIRED)
+        in: query
+        name: status
+        type: string
+      - description: RFC3339 timestamp lower bound on created_at
+        in: query
+        name: from
+        type: string
+      - description: RFC3339 timestamp upper bound on created_at
+        in: query
+        name: to
+        type: string
+      - description: page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: page size (default 20)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/pagination.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.InvoiceResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List own invoices
+      tags:
+      - invoice
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: invoice payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateInvoiceRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.InvoiceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create invoice
+      tags:
+      - invoice
+  /invoices/{id}:
+    get:
+      parameters:
+      - description: invoice id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InvoiceResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get invoice by id (own only)
+      tags:
+      - invoice
+  /pay/{token}:
+    get:
+      parameters:
+      - description: payment token from invoice
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PublicInvoiceResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: '[Public] Get invoice for payment page'
+      tags:
+      - payment
+    post:
+      consumes:
+      - application/json
+      description: Authentication is optional. If a logged-in user submits with method=WALLET,
+        the payer's wallet is debited on SUCCESS.
+      parameters:
+      - description: payment token from invoice
+        in: path
+        name: token
+        required: true
+        type: string
+      - description: payment method
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreatePaymentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.PaymentIntentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: '[Public] Create payment intent'
+      tags:
+      - payment
+  /refunds:
+    get:
+      parameters:
+      - description: page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: page size (default 20)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/pagination.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.RefundResponse'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List own refunds
+      tags:
+      - refund
+    post:
+      consumes:
+      - application/json
+      description: 'Available only when the invoice is PAID. Initial state: REQUESTED.'
+      parameters:
+      - description: refund request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RequestRefundRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.RefundResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Request a refund
+      tags:
+      - refund
+  /wallet:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WalletResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get wallet balance
+      tags:
+      - wallet
+  /wallet/topup:
+    post:
+      consumes:
+      - application/json
+      description: Creates a top-up record with status PENDING. An admin must process
+        it to credit the wallet.
+      parameters:
+      - description: top-up request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.TopupRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.TopupResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Request a wallet top-up
+      tags:
+      - wallet
+  /wallet/topups:
+    get:
+      parameters:
+      - description: page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: page size (default 20, max 100)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/pagination.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.TopupResponse'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List own top-ups
+      tags:
+      - wallet
+schemes:
+- http
+- https
+securityDefinitions:
+  BearerAuth:
+    description: 'Bearer access token. Format: "Bearer <token>"'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

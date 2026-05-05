@@ -1,0 +1,94 @@
+Payment Sandbox Application (Formal SRS Format)
+1. Introduction
+1.1 Purpose
+Dokumen ini dibuat sebagai acuan formal untuk pelaksanaan technical assessment Software Engineering (Backend).
+Assessment menggunakan aplikasi simulasi pembayaran (“Payment Sandbox App”) tanpa integrasi pihak ketiga.
+1.2 Scope
+Dokumen mencakup User Requirements, Functional Requirements, Non-Functional Requirements, System Architecture overview, dan Data Model.
+1.3 Definitions & Roles
+• End User (Payer): Pengguna yang melakukan pembayaran invoice.
+• Merchant: Pembuat invoice & penerima pembayaran (simulasi).
+• Admin: Pengelola sistem sandbox, melakukan simulasi status payment & refund.
+1.4 System Overview
+Payment Sandbox App adalah aplikasi simulasi transaksi pembayaran, mencakup pembuatan invoice, payment link, simulasi pembayaran, refund, dan dashboard monitoring.
+2. User Requirements
+2.1 Authentication & Authorization
+• User dapat mendaftar sebagai Merchant.
+• User dapat login menggunakan email & password.
+• Sistem mendukung role: MERCHANT dan ADMIN.
+• Akses halaman tergantung role.
+2.2 Merchant Wallet (Simulasi)
+• Merchant dapat melihat saldo (dummy balance).
+• Merchant dapat melakukan top-up dengan status PENDING.
+• Admin dapat mengubah status top-up ke SUCCESS/FAILED.
+• Jika SUCCESS, saldo bertambah.
+
+2.3 Invoice Management
+• Merchant dapat membuat invoice.
+• Sistem membuat invoice_number unik.
+• Merchant dapat melihat daftar invoice dengan filter.
+• Sistem menghasilkan payment link token.
+2.4 Payment Simulation
+• End User dapat membuka halaman payment public.
+• End User dapat memilih metode pembayaran: WALLET / VA_DUMMY / EWALLET_DUMMY.
+• Sistem membuat payment_intent dengan status PENDING.
+• Admin dapat mengubah payment_intent ke SUCCESS/FAILED.
+• Jika SUCCESS: invoice → PAID.
+• Sistem dapat melakukan simulasi EXPIRED bila melewati due_date.
+2.5 Refund Simulation
+• Merchant dapat request refund.
+• Admin dapat approve/reject.
+• Admin dapat memproses refund menjadi SUCCESS/FAILED.
+• Jika SUCCESS, saldo merchant berkurang.
+2.6 Admin Dashboard
+• Admin dapat melihat statistik:
+  - Total invoice created
+  - Total PAID/FAILED/EXPIRED
+  - Total nominal transaksi & refund
+• Dapat melakukan filter berdasarkan merchant & tanggal.
+3. Functional Requirements – Backend (Golang)
+3.1 Core Features
+• Registrasi & login (password hashed, JWT-based).
+• CRUD invoice.
+• Payment Intent creation (PENDING).
+• Payment & refund status update (Admin actions).
+• Transaction handling untuk payment SUCCESS & refund SUCCESS.
+• Wallet top-up simulation handling.
+3.2 API Requirements
+• REST-based API dengan response JSON.
+• Dokumentasi API wajib (Swagger/OpenAPI).
+• Pagination pada endpoint list.
+• Validation & error handling standar.
+3.3 Security Requirements
+• Password harus hashed.
+• JWT token expiry wajib.
+• Role-based authorization middleware.
+• Payment token harus random & unik.
+3.4 Data Integrity Requirements
+• Operasi berikut harus atomic:
+  - Payment SUCCESS
+  - Refund SUCCESS
+  - Top-up SUCCESS
+• Status transition mengikuti state machine:
+  - Invoice: PENDING → PAID / EXPIRED
+  - PaymentIntent: PENDING → SUCCESS / FAILED
+  - Refund: REQUESTED → APPROVED/REJECTED → SUCCESS/FAILED
+3.5 Logging & Monitoring
+• Structured logging.
+• Tracking event penting: create invoice, request refund, payment simulation.
+
+4. Non-Functional Requirements
+4.1 Performance
+• Response API normal ≤ 300ms.
+• Query database optimized (hindari N+1).
+4.2 Security
+• JWT expiry & refresh support opsional.
+• Tidak menampilkan informasi sensitif ke user.
+4.3 Code Quality
+Backend:
+• Clean architecture.
+• Layer jelas: handler → service → repository.
+• Unit test minimal untuk business logic.
+4.4 Documentation
+• README berisi cara run FE & BE.
+• API docs via Swagger.

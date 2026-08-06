@@ -5,3 +5,7 @@
 .DS_Store
 .idea/
 .vscode/
+/agent_documentation
+
+# Coverage artefacts produced by the Makefile targets.
+coverage.out

@@ -19,6 +19,10 @@ import (
 type mockPaymentIntentRepo struct {
 	store         map[uuid.UUID]*model.PaymentIntent
 	latestSuccess map[uuid.UUID]*model.PaymentIntent // keyed by invoiceID
+	// invoices, when wired, lets FailPendingForExpiredInvoices read live invoice
+	// status — mirroring the real query's EXISTS subquery against the invoices table
+	// rather than a snapshot taken earlier.
+	invoices *mockInvoiceRepo
 }
 
 func newMockPaymentIntentRepo() *mockPaymentIntentRepo {
@@ -60,12 +64,16 @@ func (m *mockPaymentIntentRepo) UpdateStatus(_ context.Context, id uuid.UUID, fr
 	return nil
 }
 
-func (m *mockPaymentIntentRepo) List(_ context.Context, invoiceID *uuid.UUID, offset, limit int) ([]model.PaymentIntent, int64, error) {
-	var result []model.PaymentIntent
+func (m *mockPaymentIntentRepo) List(_ context.Context, f repository.PaymentIntentFilter, offset, limit int) ([]model.PaymentIntent, int64, error) {
+	result := make([]model.PaymentIntent, 0)
 	for _, p := range m.store {
-		if invoiceID == nil || p.InvoiceID == *invoiceID {
-			result = append(result, *p)
+		if f.InvoiceID != nil && p.InvoiceID != *f.InvoiceID {
+			continue
 		}
+		if f.Status != nil && p.Status != *f.Status {
+			continue
+		}
+		result = append(result, *p)
 	}
 	return result, int64(len(result)), nil
 }
@@ -76,6 +84,30 @@ func (m *mockPaymentIntentRepo) FindLatestSuccessByInvoice(_ context.Context, in
 		return nil, apperror.ErrNotFound
 	}
 	return p, nil
+}
+
+// FailPendingForExpiredInvoices mirrors the real UPDATE: PENDING intents whose invoice
+// is EXPIRED get settled as FAILED. Invoice status is read live from the invoice repo,
+// so a test can prove the service runs this *after* MarkExpired.
+func (m *mockPaymentIntentRepo) FailPendingForExpiredInvoices(_ context.Context, now time.Time) (int64, error) {
+	if m.invoices == nil {
+		return 0, nil // no invoice table wired: nothing can be matched
+	}
+	var n int64
+	for _, p := range m.store {
+		if p.Status != constant.PaymentPending {
+			continue
+		}
+		inv, ok := m.invoices.store[p.InvoiceID]
+		if !ok || inv.Status != constant.InvoiceExpired {
+			continue
+		}
+		p.Status = constant.PaymentFailed
+		processed := now
+		p.ProcessedAt = &processed
+		n++
+	}
+	return n, nil
 }
 
 var _ repository.PaymentIntentRepository = (*mockPaymentIntentRepo)(nil)

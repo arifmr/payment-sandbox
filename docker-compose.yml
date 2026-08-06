@@ -7,7 +7,11 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: payment_sandbox
     ports:
-      - "5432:5432"
+      # Host port is configurable because 5432 is often already taken by another
+      # project's container or a local Postgres install. Default keeps the usual
+      # 5432; set POSTGRES_HOST_PORT in .env to move it. Container port never changes,
+      # so DATABASE_URL is the only other place that needs to agree.
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -15,6 +19,76 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # One-shot: apply migrations and seed the admin, then exit 0. Separate from `api`
+  # on purpose — migrations are a deploy step, not a boot step. If every replica ran
+  # them at startup, N replicas would race on the same DDL, and a failed migration
+  # would look like a crashlooping app instead of a failed deploy.
+  migrate:
+    build: .
+    image: payment-sandbox-api
+    container_name: payment-sandbox-migrate
+    command: ["migrate"]
+    env_file: .env
+    environment:
+      # Overrides the DATABASE_URL from .env, which points at localhost for running
+      # the app from the host. Inside the compose network the host is the service
+      # name and the port is the *container* port 5432 — never the published
+      # POSTGRES_HOST_PORT, which only exists on the host side.
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/payment_sandbox?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: .
+    image: payment-sandbox-api
+    container_name: payment-sandbox-api
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/payment_sandbox?sslmode=disable
+      HTTP_PORT: "8080"
+    ports:
+      # Same reasoning as POSTGRES_HOST_PORT: 8080 collides easily, and you may already
+      # have `go run ./cmd/api` on it. Container port stays 8080.
+      - "${API_HOST_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        # Boot only after migrations succeeded. Without this the app can come up
+        # against a schema that does not exist yet and fail its first queries.
+        condition: service_completed_successfully
+    healthcheck:
+      # /readyz, not /healthz: readiness checks the database, liveness deliberately
+      # does not. See the operational endpoints table in README.md.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # Production build of the SPA, served by nginx. This is not a replacement for
+  # `npm run dev` — Vite's dev server keeps hot reload and is still the right tool
+  # while writing frontend code. This is what the built app actually looks like.
+  web:
+    build: ./web
+    image: payment-sandbox-web
+    container_name: payment-sandbox-web
+    ports:
+      - "${WEB_HOST_PORT:-3000}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
 
 volumes:
   pgdata:

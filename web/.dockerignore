@@ -1,0 +1,20 @@
+# node_modules is 115 MB and is reinstalled inside the image by `npm ci` anyway.
+# Sending it as build context would be pure waste — and worse, host-built native
+# modules can be the wrong architecture for the image.
+node_modules/
+
+# Build outputs: produced inside the image, never copied in.
+dist/
+coverage/
+*.tsbuildinfo
+
+# Local env. Vite inlines VITE_* at build time, so a stray .env here would be
+# baked into the shipped JS. The image must be built without it.
+.env
+.env.*
+!.env.example
+
+.git/
+.DS_Store
+.vscode/
+.idea/

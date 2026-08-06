@@ -17,6 +17,10 @@ type PaymentService interface {
 	CreateIntent(ctx context.Context, paymentToken string, method constant.PaymentMethod, payerUserID *uuid.UUID) (*model.PaymentIntent, error)
 	Process(ctx context.Context, intentID uuid.UUID, success bool) (*model.PaymentIntent, error)
 	GetIntent(ctx context.Context, id uuid.UUID) (*model.PaymentIntent, error)
+	// GetIntentByToken returns an intent only if it belongs to the invoice behind
+	// paymentToken — possession of the token is the payer's authorization.
+	GetIntentByToken(ctx context.Context, paymentToken string, intentID uuid.UUID) (*model.PaymentIntent, error)
+	ListIntents(ctx context.Context, f repository.PaymentIntentFilter, offset, limit int) ([]model.PaymentIntent, int64, error)
 }
 
 type paymentService struct {
@@ -77,17 +81,16 @@ func (s *paymentService) Process(ctx context.Context, intentID uuid.UUID, succes
 		if err != nil {
 			return err
 		}
-		if intent.Status != constant.PaymentPending {
-			return apperror.ErrInvalidState
-		}
-
 		now := time.Now().UTC()
 		newStatus := constant.PaymentFailed
 		if success {
 			newStatus = constant.PaymentSuccess
 		}
+		if !constant.PaymentFSM.Can(intent.Status, newStatus) {
+			return apperror.ErrInvalidState
+		}
 
-		if err := s.intents.UpdateStatus(ctx, intentID, constant.PaymentPending, newStatus, &now); err != nil {
+		if err := s.intents.UpdateStatus(ctx, intentID, intent.Status, newStatus, &now); err != nil {
 			return err
 		}
 
@@ -96,7 +99,7 @@ func (s *paymentService) Process(ctx context.Context, intentID uuid.UUID, succes
 			if err != nil {
 				return err
 			}
-			if inv.Status != constant.InvoicePending {
+			if !constant.InvoiceFSM.Can(inv.Status, constant.InvoicePaid) {
 				return apperror.ErrInvoiceNotPayable
 			}
 			if err := s.invoices.UpdateStatus(ctx, inv.ID, constant.InvoicePending, constant.InvoicePaid, &now); err != nil {
@@ -124,4 +127,24 @@ func (s *paymentService) Process(ctx context.Context, intentID uuid.UUID, succes
 
 func (s *paymentService) GetIntent(ctx context.Context, id uuid.UUID) (*model.PaymentIntent, error) {
 	return s.intents.FindByID(ctx, id)
+}
+
+func (s *paymentService) GetIntentByToken(ctx context.Context, paymentToken string, intentID uuid.UUID) (*model.PaymentIntent, error) {
+	inv, err := s.invoices.FindByPaymentToken(ctx, paymentToken)
+	if err != nil {
+		return nil, err
+	}
+	intent, err := s.intents.FindByID(ctx, intentID)
+	if err != nil {
+		return nil, err
+	}
+	if intent.InvoiceID != inv.ID {
+		// Do not confirm the intent exists under someone else's invoice.
+		return nil, apperror.ErrNotFound
+	}
+	return intent, nil
+}
+
+func (s *paymentService) ListIntents(ctx context.Context, f repository.PaymentIntentFilter, offset, limit int) ([]model.PaymentIntent, int64, error) {
+	return s.intents.List(ctx, f, offset, limit)
 }

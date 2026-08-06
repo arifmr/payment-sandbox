@@ -1,0 +1,35 @@
+# Everything here is excluded from the build context sent to the Docker daemon.
+# Without this file the context is ~119 MB, almost all of it web/node_modules —
+# re-uploaded on every build, for files the backend image never uses.
+
+# Frontend: not part of the backend image at all.
+web/
+
+# VCS and local tooling
+.git/
+.gitignore
+.github/
+
+# Secrets and local config. The image must get these from env at runtime, never
+# baked in at build time — a committed layer keeps them forever.
+.env
+.env.*
+!.env.example
+
+# Build outputs and caches
+bin/
+dist/
+coverage/
+*.out
+*.test
+
+# Editor / OS noise
+.idea/
+.vscode/
+.DS_Store
+
+# Docs are not needed to compile. agent_documentation/ holds design write-ups,
+# docs/ is the generated Swagger package and IS needed (it is a Go package
+# imported by main), so it is deliberately not excluded here.
+agent_documentation/
+README.md

@@ -43,6 +43,11 @@ func (m *mockTopupRepo) UpdateStatus(_ context.Context, id uuid.UUID, status con
 	if !ok {
 		return apperror.ErrNotFound
 	}
+	// Mirror the real repo: the UPDATE carries `AND status = 'PENDING'`, so a
+	// non-pending topup affects zero rows.
+	if t.Status != constant.TopupPending {
+		return apperror.ErrInvalidState
+	}
 	t.Status = status
 	if processedAt != nil {
 		t.ProcessedAt = processedAt

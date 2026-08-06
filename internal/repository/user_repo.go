@@ -33,7 +33,7 @@ func (r *userRepo) Create(ctx context.Context, u *model.User) error {
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 		u.ID, u.Email, u.PasswordHash, u.Name, u.Role, u.CreatedAt, u.UpdatedAt,
 	)
-	return err
+	return mapWriteError(err)
 }
 
 func (r *userRepo) FindByEmail(ctx context.Context, email string) (*model.User, error) {

@@ -30,7 +30,7 @@ func (r *walletRepo) Create(ctx context.Context, w *model.Wallet) error {
 		VALUES ($1, $2, $3, $4, $5)`,
 		w.ID, w.MerchantID, w.Balance, w.Version, w.UpdatedAt,
 	)
-	return err
+	return mapWriteError(err)
 }
 
 func (r *walletRepo) FindByMerchantID(ctx context.Context, merchantID uuid.UUID) (*model.Wallet, error) {

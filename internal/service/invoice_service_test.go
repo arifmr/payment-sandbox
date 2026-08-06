@@ -19,6 +19,13 @@ import (
 type mockInvoiceRepo struct {
 	store      map[uuid.UUID]*model.Invoice
 	tokenIndex map[string]*model.Invoice
+
+	// createErrs is consumed one entry per Create call, letting a test simulate
+	// unique-constraint collisions before a success.
+	createErrs  []error
+	createCalls int
+	// lockedForUpdate counts FindByIDForUpdate calls.
+	lockedForUpdate int
 }
 
 func newMockInvoiceRepo() *mockInvoiceRepo {
@@ -29,6 +36,17 @@ func newMockInvoiceRepo() *mockInvoiceRepo {
 }
 
 func (m *mockInvoiceRepo) Create(_ context.Context, inv *model.Invoice) error {
+	m.createCalls++
+	if len(m.createErrs) > 0 {
+		err := m.createErrs[0]
+		m.createErrs = m.createErrs[1:]
+		if err != nil {
+			return err
+		}
+	}
+	if _, clash := m.tokenIndex[inv.PaymentToken]; clash {
+		return apperror.New(apperror.KindConflict, "DUPLICATE", "payment_token already exists")
+	}
 	inv.CreatedAt = time.Now()
 	m.store[inv.ID] = inv
 	m.tokenIndex[inv.PaymentToken] = inv
@@ -41,6 +59,13 @@ func (m *mockInvoiceRepo) FindByID(_ context.Context, id uuid.UUID) (*model.Invo
 		return nil, apperror.ErrNotFound
 	}
 	return inv, nil
+}
+
+// FindByIDForUpdate has no separate locking semantics in-memory; the tests that
+// care about serialization assert on call ordering instead.
+func (m *mockInvoiceRepo) FindByIDForUpdate(ctx context.Context, id uuid.UUID) (*model.Invoice, error) {
+	m.lockedForUpdate++
+	return m.FindByID(ctx, id)
 }
 
 func (m *mockInvoiceRepo) FindByPaymentToken(_ context.Context, token string) (*model.Invoice, error) {
@@ -91,9 +116,30 @@ var _ repository.InvoiceRepository = (*mockInvoiceRepo)(nil)
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
+// newInvoiceSvc builds the service with a lock that always grants, which is the
+// single-instance case. Tests that care about contention pass their own locker.
 func newInvoiceSvc(repo *mockInvoiceRepo) InvoiceService {
-	return NewInvoiceService(repo)
+	return NewInvoiceService(repo, newMockPaymentIntentRepo(), grantingLocker{}, noopUoW{})
 }
+
+// grantingLocker always acquires: models a single running instance.
+type grantingLocker struct{}
+
+func (grantingLocker) TryLockTx(context.Context, repository.AdvisoryLockKey) (bool, error) {
+	return true, nil
+}
+
+// denyingLocker never acquires: models another replica already sweeping.
+type denyingLocker struct{}
+
+func (denyingLocker) TryLockTx(context.Context, repository.AdvisoryLockKey) (bool, error) {
+	return false, nil
+}
+
+var (
+	_ repository.AdvisoryLocker = grantingLocker{}
+	_ repository.AdvisoryLocker = denyingLocker{}
+)
 
 func validCreateInput(merchantID uuid.UUID) CreateInvoiceInput {
 	return CreateInvoiceInput{
@@ -273,12 +319,12 @@ func TestInvoiceService_ExpireDue(t *testing.T) {
 		DueDate:    time.Now().Add(-time.Hour), // past due
 	}
 
-	count, err := svc.ExpireDue(context.Background())
+	res, err := svc.ExpireDue(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if count != 1 {
-		t.Fatalf("want 1 expired invoice, got %d", count)
+	if res.InvoicesExpired != 1 {
+		t.Fatalf("want 1 expired invoice, got %d", res.InvoicesExpired)
 	}
 	if repo.store[overdueID].Status != constant.InvoiceExpired {
 		t.Fatalf("overdue invoice must be EXPIRED, got %s", repo.store[overdueID].Status)

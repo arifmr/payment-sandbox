@@ -43,6 +43,13 @@ func Wrap(kind Kind, code, message string, err error) *Error {
 	return &Error{Kind: kind, Code: code, Message: message, Err: err}
 }
 
+// IsKind reports whether err is (or wraps) an *Error of the given kind. It lets
+// callers branch on error category without depending on a specific sentinel.
+func IsKind(err error, k Kind) bool {
+	var ae *Error
+	return errors.As(err, &ae) && ae.Kind == k
+}
+
 func HTTPStatus(err error) int {
 	var ae *Error
 	if !errors.As(err, &ae) {

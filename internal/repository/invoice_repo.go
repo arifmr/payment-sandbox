@@ -39,12 +39,18 @@ func (r *invoiceRepo) Create(ctx context.Context, inv *model.Invoice) error {
 		inv.Amount, inv.Status, inv.DueDate, inv.PaymentToken, inv.CreatedAt, inv.UpdatedAt,
 		timePtrToNullTime(inv.PaidAt),
 	)
-	return err
+	return mapWriteError(err)
 }
 
 func (r *invoiceRepo) FindByID(ctx context.Context, id uuid.UUID) (*model.Invoice, error) {
 	row := transaction.FromCtx(ctx, r.db).QueryRowContext(ctx,
 		`SELECT `+invoiceColumns+` FROM invoices WHERE id = $1`, id)
+	return scanInvoice(row)
+}
+
+func (r *invoiceRepo) FindByIDForUpdate(ctx context.Context, id uuid.UUID) (*model.Invoice, error) {
+	row := transaction.FromCtx(ctx, r.db).QueryRowContext(ctx,
+		`SELECT `+invoiceColumns+` FROM invoices WHERE id = $1 FOR UPDATE`, id)
 	return scanInvoice(row)
 }
 

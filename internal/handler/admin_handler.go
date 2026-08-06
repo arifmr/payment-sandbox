@@ -28,9 +28,9 @@ func NewAdminHandler(a service.AdminService) *AdminHandler { return &AdminHandle
 // @Param        from        query string false "RFC3339 timestamp lower bound"
 // @Param        to          query string false "RFC3339 timestamp upper bound"
 // @Success      200 {object} repository.DashboardStats
-// @Failure      400 {object} dto.ErrorResponse
-// @Failure      401 {object} dto.ErrorResponse
-// @Failure      403 {object} dto.ErrorResponse
+// @Failure      400 {object} model.ErrorResponse
+// @Failure      401 {object} model.ErrorResponse
+// @Failure      403 {object} model.ErrorResponse
 // @Router       /admin/dashboard [get]
 func (h *AdminHandler) Dashboard(c *gin.Context) {
 	f := repository.DashboardFilter{}

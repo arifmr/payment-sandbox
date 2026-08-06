@@ -10,6 +10,7 @@ import (
 	"github.com/dboarif/payment-sandbox/internal/middleware"
 	"github.com/dboarif/payment-sandbox/internal/model"
 	"github.com/dboarif/payment-sandbox/internal/pkg/apperror"
+	"github.com/dboarif/payment-sandbox/internal/pkg/pagination"
 	"github.com/dboarif/payment-sandbox/internal/repository"
 	"github.com/dboarif/payment-sandbox/internal/service"
 )
@@ -77,6 +78,104 @@ func (h *PaymentHandler) CreateIntent(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, model.ToPaymentIntent(pi))
+}
+
+// GetIntentByToken godoc
+// @Summary      [Public] Payment status for an intent
+// @Description  Lets the payer poll their payment status. The intent must belong to the invoice behind the token.
+// @Tags         payment
+// @Produce      json
+// @Param        token path string true "payment token from invoice"
+// @Param        id    path string true "payment intent id (uuid)"
+// @Success      200 {object} model.PaymentIntentResponse
+// @Failure      400 {object} model.ErrorResponse
+// @Failure      404 {object} model.ErrorResponse
+// @Router       /pay/{token}/intents/{id} [get]
+func (h *PaymentHandler) GetIntentByToken(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.Error(apperror.New(apperror.KindBadRequest, "INVALID_ID", "invalid payment intent id"))
+		return
+	}
+	pi, err := h.payment.GetIntentByToken(c.Request.Context(), c.Param("token"), id)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, model.ToPaymentIntent(pi))
+}
+
+// AdminGetIntent godoc
+// @Summary      [Admin] Get a payment intent
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "payment intent id (uuid)"
+// @Success      200 {object} model.PaymentIntentResponse
+// @Failure      400 {object} model.ErrorResponse
+// @Failure      401 {object} model.ErrorResponse
+// @Failure      403 {object} model.ErrorResponse
+// @Failure      404 {object} model.ErrorResponse
+// @Router       /admin/payments/{id} [get]
+func (h *PaymentHandler) AdminGetIntent(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.Error(apperror.New(apperror.KindBadRequest, "INVALID_ID", "invalid payment intent id"))
+		return
+	}
+	pi, err := h.payment.GetIntent(c.Request.Context(), id)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, model.ToPaymentIntent(pi))
+}
+
+// AdminListIntents godoc
+// @Summary      [Admin] Search payment intents
+// @Description  Backs the admin payment simulation panel: find intents to finalize, filtered by invoice and/or status.
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        invoice_id query string false "filter by invoice uuid"
+// @Param        status     query string false "filter by status (PENDING/SUCCESS/FAILED)"
+// @Param        page       query int    false "page (default 1)"
+// @Param        page_size  query int    false "page size (default 20, max 100)"
+// @Success      200 {object} pagination.Response{data=[]model.PaymentIntentResponse}
+// @Failure      400 {object} model.ErrorResponse
+// @Failure      401 {object} model.ErrorResponse
+// @Failure      403 {object} model.ErrorResponse
+// @Router       /admin/payments [get]
+func (h *PaymentHandler) AdminListIntents(c *gin.Context) {
+	f := repository.PaymentIntentFilter{}
+	if v := c.Query("invoice_id"); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			c.Error(apperror.New(apperror.KindBadRequest, "INVALID_ID", "invalid invoice_id"))
+			return
+		}
+		f.InvoiceID = &id
+	}
+	if v := c.Query("status"); v != "" {
+		st := constant.PaymentIntentStatus(v)
+		if !st.Valid() {
+			c.Error(apperror.New(apperror.KindBadRequest, "INVALID_STATUS", "invalid status filter"))
+			return
+		}
+		f.Status = &st
+	}
+
+	p := pagination.FromQuery(c)
+	items, total, err := h.payment.ListIntents(c.Request.Context(), f, p.Offset(), p.Limit())
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	out := make([]model.PaymentIntentResponse, 0, len(items))
+	for i := range items {
+		out = append(out, model.ToPaymentIntent(&items[i]))
+	}
+	c.JSON(http.StatusOK, pagination.Wrap(out, p, total))
 }
 
 // AdminProcess godoc

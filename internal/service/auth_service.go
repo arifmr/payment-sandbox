@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -95,6 +96,11 @@ func (s *authService) Register(ctx context.Context, name, email, password string
 
 	err = s.uow.Do(ctx, func(ctx context.Context) error {
 		if err := s.users.Create(ctx, u); err != nil {
+			// The pre-check above races with concurrent registrations; the UNIQUE
+			// index is the real authority, so translate its verdict.
+			if apperror.IsKind(err, apperror.KindConflict) {
+				return apperror.ErrEmailTaken
+			}
 			return err
 		}
 		return s.wallets.Create(ctx, &model.Wallet{
@@ -114,6 +120,9 @@ func (s *authService) Login(ctx context.Context, email, password string) (*Token
 	u, err := s.users.FindByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, apperror.ErrNotFound) {
+			// Spend the same time a real verification would, so the response time does
+			// not reveal whether the account exists. See hash.CompareDecoy.
+			s.hasher.CompareDecoy()
 			return nil, apperror.ErrInvalidCredentials
 		}
 		return nil, err
@@ -141,9 +150,34 @@ func (s *authService) Refresh(ctx context.Context, refreshToken string) (*TokenP
 			return err
 		}
 		now := time.Now().UTC()
+
+		// Reuse detection. Tokens are single-use: /auth/refresh revokes the one it was
+		// given. Seeing an already-revoked token means the same token was presented
+		// twice, and only two things cause that — a stolen token being replayed, or a
+		// client replaying its own. Neither can be distinguished here, so assume the
+		// worse: the whole token chain for this user is compromised, and every one of
+		// them is revoked. The attacker keeps nothing usable, and the legitimate user is
+		// forced through a fresh login.
+		if stored.RevokedAt != nil {
+			if err := s.refresh.RevokeAllForUser(ctx, stored.UserID, now); err != nil {
+				return err
+			}
+			// Logged at the package default, set once at startup — threading a logger
+			// through this constructor for a single event is not worth the churn.
+			slog.Warn("refresh_token_reuse_detected",
+				slog.String("user_id", stored.UserID.String()),
+				slog.String("token_id", stored.ID.String()),
+				slog.String("action", "revoked_all_sessions_for_user"),
+			)
+			return apperror.ErrUnauthorized
+		}
+
+		// Merely expired is not reuse — it is the normal end of a session's life, so it
+		// must not tear down the user's other sessions.
 		if !stored.IsActive(now) {
 			return apperror.ErrUnauthorized
 		}
+
 		// Rotate: revoke old.
 		if err := s.refresh.Revoke(ctx, stored.ID, now); err != nil {
 			return err

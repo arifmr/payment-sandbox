@@ -1,0 +1,174 @@
+.pay-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: start center;
+  padding: var(--space-5) var(--space-4) var(--space-7);
+  background:
+    radial-gradient(900px 420px at 50% -8%, var(--accent-soft), transparent 70%),
+    var(--bg);
+}
+
+.pay-card {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.pay-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.pay-brand {
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.pay-title {
+  font-size: var(--text-xl);
+}
+
+.pay-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface-sunken);
+  border-radius: var(--radius);
+}
+
+.pay-amount-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+.pay-amount-label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 650;
+}
+
+.pay-amount {
+  font-size: var(--text-3xl);
+  line-height: 1.1;
+}
+
+.pay-section-title {
+  font-size: var(--text-base);
+}
+
+.pay-foot {
+  text-align: center;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+/* ── method picker ──────────────────────────────────────────────────────────── */
+
+.method-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.method {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.method:hover {
+  background: var(--surface-sunken);
+}
+
+.method.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* The radio stays in the DOM (never display:none) so it remains focusable and
+   announced; it is simply sized to sit inline with the label. */
+.method input[type='radio'] {
+  margin-top: 0.28rem;
+  accent-color: var(--accent);
+  flex: none;
+}
+
+.method-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.method-name {
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.method-hint {
+  line-height: 1.35;
+}
+
+/* ── status ─────────────────────────────────────────────────────────────────── */
+
+.pay-status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+}
+
+.pay-status-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.pay-status-text {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.pay-status-success {
+  background: var(--success-soft);
+  border-color: var(--success);
+}
+.pay-status-failed {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+.pay-status-pending {
+  background: var(--warning-soft);
+  border-color: var(--warning);
+}
+
+@media (max-width: 480px) {
+  .pay-card {
+    padding: var(--space-4);
+  }
+  .pay-amount {
+    font-size: var(--text-2xl);
+  }
+}

@@ -30,7 +30,7 @@ func (r *refreshTokenRepo) Create(ctx context.Context, t *model.RefreshToken) er
 		VALUES ($1, $2, $3, $4, $5, $6)`,
 		t.ID, t.UserID, t.TokenHash, t.ExpiresAt, timePtrToNullTime(t.RevokedAt), t.CreatedAt,
 	)
-	return err
+	return mapWriteError(err)
 }
 
 func (r *refreshTokenRepo) FindByHash(ctx context.Context, hash string) (*model.RefreshToken, error) {

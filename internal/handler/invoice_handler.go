@@ -116,6 +116,10 @@ func (h *InvoiceHandler) List(c *gin.Context) {
 	f := repository.InvoiceFilter{MerchantID: &uid}
 	if s := c.Query("status"); s != "" {
 		st := constant.InvoiceStatus(s)
+		if !st.Valid() {
+			c.Error(apperror.New(apperror.KindBadRequest, "INVALID_STATUS", "invalid status filter"))
+			return
+		}
 		f.Status = &st
 	}
 	if v := c.Query("from"); v != "" {

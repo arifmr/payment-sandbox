@@ -1,6 +1,6 @@
 basePath: /api/v1
 definitions:
-  dto.CreateInvoiceRequest:
+  model.CreateInvoiceRequest:
     properties:
       amount:
         type: integer
@@ -21,7 +21,7 @@ definitions:
     - customer_name
     - due_date
     type: object
-  dto.CreatePaymentRequest:
+  model.CreatePaymentRequest:
     properties:
       method:
         enum:
@@ -32,19 +32,19 @@ definitions:
     required:
     - method
     type: object
-  dto.ErrorBody:
+  model.ErrorBody:
     properties:
       code:
         type: string
       message:
         type: string
     type: object
-  dto.ErrorResponse:
+  model.ErrorResponse:
     properties:
       error:
-        $ref: '#/definitions/dto.ErrorBody'
+        $ref: '#/definitions/model.ErrorBody'
     type: object
-  dto.InvoiceResponse:
+  model.InvoiceResponse:
     properties:
       amount:
         type: integer
@@ -73,7 +73,7 @@ definitions:
       status:
         type: string
     type: object
-  dto.LoginRequest:
+  model.LoginRequest:
     properties:
       email:
         example: toko@example.com
@@ -85,7 +85,7 @@ definitions:
     - email
     - password
     type: object
-  dto.LoginResponse:
+  model.LoginResponse:
     properties:
       access_expires_at:
         type: string
@@ -96,16 +96,16 @@ definitions:
       refresh_token:
         type: string
       user:
-        $ref: '#/definitions/dto.UserResponse'
+        $ref: '#/definitions/model.UserResponse'
     type: object
-  dto.LogoutRequest:
+  model.LogoutRequest:
     properties:
       refresh_token:
         type: string
     required:
     - refresh_token
     type: object
-  dto.PaymentActionRequest:
+  model.PaymentActionRequest:
     properties:
       action:
         enum:
@@ -115,7 +115,7 @@ definitions:
     required:
     - action
     type: object
-  dto.PaymentIntentResponse:
+  model.PaymentIntentResponse:
     properties:
       amount:
         type: integer
@@ -132,7 +132,7 @@ definitions:
       status:
         type: string
     type: object
-  dto.PublicInvoiceResponse:
+  model.PublicInvoiceResponse:
     properties:
       amount:
         type: integer
@@ -149,18 +149,16 @@ definitions:
       status:
         type: string
     type: object
-  dto.RefreshRequest:
+  model.RefreshRequest:
     properties:
       refresh_token:
         type: string
     required:
     - refresh_token
     type: object
-  dto.RefundActionRequest:
+  model.RefundActionRequest:
     properties:
       action:
-        description: APPROVE | REJECT (when status REQUESTED), PROCESS | FAIL (when
-          status APPROVED)
         enum:
         - APPROVE
         - REJECT
@@ -170,7 +168,7 @@ definitions:
     required:
     - action
     type: object
-  dto.RefundResponse:
+  model.RefundResponse:
     properties:
       amount:
         type: integer
@@ -191,7 +189,7 @@ definitions:
       status:
         type: string
     type: object
-  dto.RegisterRequest:
+  model.RegisterRequest:
     properties:
       email:
         example: toko@example.com
@@ -211,7 +209,7 @@ definitions:
     - name
     - password
     type: object
-  dto.RequestRefundRequest:
+  model.RequestRefundRequest:
     properties:
       amount:
         type: integer
@@ -224,7 +222,7 @@ definitions:
     - amount
     - invoice_id
     type: object
-  dto.TopupActionRequest:
+  model.TopupActionRequest:
     properties:
       action:
         enum:
@@ -234,14 +232,14 @@ definitions:
     required:
     - action
     type: object
-  dto.TopupRequest:
+  model.TopupRequest:
     properties:
       amount:
         type: integer
     required:
     - amount
     type: object
-  dto.TopupResponse:
+  model.TopupResponse:
     properties:
       amount:
         type: integer
@@ -256,7 +254,7 @@ definitions:
       status:
         type: string
     type: object
-  dto.UserResponse:
+  model.UserResponse:
     properties:
       email:
         type: string
@@ -267,7 +265,7 @@ definitions:
       role:
         type: string
     type: object
-  dto.WalletResponse:
+  model.WalletResponse:
     properties:
       balance:
         type: integer
@@ -339,21 +337,108 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       security:
       - BearerAuth: []
       summary: '[Admin] Dashboard statistics'
       tags:
       - admin
+  /admin/payments:
+    get:
+      description: 'Backs the admin payment simulation panel: find intents to finalize,
+        filtered by invoice and/or status.'
+      parameters:
+      - description: filter by invoice uuid
+        in: query
+        name: invoice_id
+        type: string
+      - description: filter by status (PENDING/SUCCESS/FAILED)
+        in: query
+        name: status
+        type: string
+      - description: page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: page size (default 20, max 100)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/pagination.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.PaymentIntentResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: '[Admin] Search payment intents'
+      tags:
+      - admin
   /admin/payments/{id}:
+    get:
+      parameters:
+      - description: payment intent id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.PaymentIntentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: '[Admin] Get a payment intent'
+      tags:
+      - admin
     patch:
       consumes:
       - application/json
@@ -370,34 +455,34 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.PaymentActionRequest'
+          $ref: '#/definitions/model.PaymentActionRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.PaymentIntentResponse'
+            $ref: '#/definitions/model.PaymentIntentResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       security:
       - BearerAuth: []
       summary: '[Admin] Finalize a payment intent'
@@ -425,17 +510,17 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/dto.RefundResponse'
+                    $ref: '#/definitions/model.RefundResponse'
                   type: array
               type: object
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       security:
       - BearerAuth: []
       summary: '[Admin] List all refunds'
@@ -459,34 +544,34 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.RefundActionRequest'
+          $ref: '#/definitions/model.RefundActionRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.RefundResponse'
+            $ref: '#/definitions/model.RefundResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       security:
       - BearerAuth: []
       summary: '[Admin] Refund state machine action'
@@ -518,17 +603,17 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/dto.TopupResponse'
+                    $ref: '#/definitions/model.TopupResponse'
                   type: array
               type: object
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       security:
       - BearerAuth: []
       summary: '[Admin] List all top-ups'
@@ -551,34 +636,34 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.TopupActionRequest'
+          $ref: '#/definitions/model.TopupActionRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.TopupResponse'
+            $ref: '#/definitions/model.TopupResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       security:
       - BearerAuth: []
       summary: '[Admin] Finalize a top-up'
@@ -595,22 +680,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.LoginRequest'
+          $ref: '#/definitions/model.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.LoginResponse'
+            $ref: '#/definitions/model.LoginResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       summary: Login
       tags:
       - auth
@@ -625,7 +710,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.LogoutRequest'
+          $ref: '#/definitions/model.LogoutRequest'
       produces:
       - application/json
       responses:
@@ -634,7 +719,7 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       summary: Logout
       tags:
       - auth
@@ -650,22 +735,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.RefreshRequest'
+          $ref: '#/definitions/model.RefreshRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.LoginResponse'
+            $ref: '#/definitions/model.LoginResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       summary: Refresh tokens
       tags:
       - auth
@@ -681,22 +766,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.RegisterRequest'
+          $ref: '#/definitions/model.RegisterRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.UserResponse'
+            $ref: '#/definitions/model.UserResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       summary: Register merchant
       tags:
       - auth
@@ -734,17 +819,17 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/dto.InvoiceResponse'
+                    $ref: '#/definitions/model.InvoiceResponse'
                   type: array
               type: object
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List own invoices
@@ -759,22 +844,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateInvoiceRequest'
+          $ref: '#/definitions/model.CreateInvoiceRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.InvoiceResponse'
+            $ref: '#/definitions/model.InvoiceResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create invoice
@@ -794,19 +879,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.InvoiceResponse'
+            $ref: '#/definitions/model.InvoiceResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get invoice by id (own only)
@@ -826,11 +911,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.PublicInvoiceResponse'
+            $ref: '#/definitions/model.PublicInvoiceResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       summary: '[Public] Get invoice for payment page'
       tags:
       - payment
@@ -850,27 +935,60 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreatePaymentRequest'
+          $ref: '#/definitions/model.CreatePaymentRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.PaymentIntentResponse'
+            $ref: '#/definitions/model.PaymentIntentResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       summary: '[Public] Create payment intent'
+      tags:
+      - payment
+  /pay/{token}/intents/{id}:
+    get:
+      description: Lets the payer poll their payment status. The intent must belong
+        to the invoice behind the token.
+      parameters:
+      - description: payment token from invoice
+        in: path
+        name: token
+        required: true
+        type: string
+      - description: payment intent id (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.PaymentIntentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: '[Public] Payment status for an intent'
       tags:
       - payment
   /refunds:
@@ -895,13 +1013,13 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/dto.RefundResponse'
+                    $ref: '#/definitions/model.RefundResponse'
                   type: array
               type: object
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List own refunds
@@ -917,34 +1035,34 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.RequestRefundRequest'
+          $ref: '#/definitions/model.RequestRefundRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.RefundResponse'
+            $ref: '#/definitions/model.RefundResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Request a refund
@@ -958,11 +1076,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.WalletResponse'
+            $ref: '#/definitions/model.WalletResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get wallet balance
@@ -980,22 +1098,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.TopupRequest'
+          $ref: '#/definitions/model.TopupRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.TopupResponse'
+            $ref: '#/definitions/model.TopupResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Request a wallet top-up
@@ -1023,13 +1141,13 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/dto.TopupResponse'
+                    $ref: '#/definitions/model.TopupResponse'
                   type: array
               type: object
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/model.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List own top-ups

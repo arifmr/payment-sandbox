@@ -58,13 +58,13 @@ func (s *walletService) ProcessTopup(ctx context.Context, topupID uuid.UUID, suc
 		if err != nil {
 			return err
 		}
-		if t.Status != constant.TopupPending {
-			return apperror.ErrInvalidState
-		}
 		now := time.Now().UTC()
 		newStatus := constant.TopupFailed
 		if success {
 			newStatus = constant.TopupSuccess
+		}
+		if !constant.TopupFSM.Can(t.Status, newStatus) {
+			return apperror.ErrInvalidState
 		}
 		if err := s.topups.UpdateStatus(ctx, topupID, newStatus, &now); err != nil {
 			return err

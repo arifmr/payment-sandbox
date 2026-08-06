@@ -1,0 +1,31 @@
+# Overlay for running test/e2e against the dockerized stack:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build
+#
+# It exists for one reason: the auth endpoints are rate limited (30/min per IP), and every
+# e2e scenario registers its own merchant to stay isolated — two auth calls each. A few
+# dozen scenarios exceed that budget on setup alone, so the suite would spend its time
+# waiting out a limiter that is working exactly as designed.
+#
+# Relaxing the limit here rather than in .env keeps the shipped defaults honest: the normal
+# stack still enforces them, and only a run that explicitly opts in gets the loose ones.
+#
+# The rate-limit scenario itself needs the real values and is skipped unless
+# E2E_STRICT_RATELIMIT=1, which means it must be run against the plain compose file. The
+# two cannot be satisfied at once; see test/e2e/README.md.
+services:
+  api:
+    environment:
+      AUTH_RATE_LIMIT_PER_MINUTE: "100000"
+      AUTH_RATE_LIMIT_BURST: "100000"
+      LOGIN_RATE_LIMIT_PER_MINUTE: "100000"
+      LOGIN_RATE_LIMIT_BURST: "100000"
+
+      # A short sweep interval so expiry-related behaviour is observable within a test run
+      # instead of after the default full minute.
+      INVOICE_EXPIRY_CHECK_INTERVAL: "5s"
+
+      # Cheaper hashing. Cost 12 is right for production and deliberately slow (~200-400ms
+      # per hash); across a suite that registers and logs in dozens of times, that slowness
+      # dominates the runtime while proving nothing the pkg/hash unit tests do not already.
+      BCRYPT_COST: "6"

@@ -45,6 +45,9 @@ type InvoiceFilter struct {
 type InvoiceRepository interface {
 	Create(ctx context.Context, inv *model.Invoice) error
 	FindByID(ctx context.Context, id uuid.UUID) (*model.Invoice, error)
+	// FindByIDForUpdate takes a row lock (SELECT ... FOR UPDATE) so callers can
+	// read-then-write without a lost update. Only meaningful inside a transaction.
+	FindByIDForUpdate(ctx context.Context, id uuid.UUID) (*model.Invoice, error)
 	FindByPaymentToken(ctx context.Context, token string) (*model.Invoice, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, from, to constant.InvoiceStatus, paidAt *time.Time) error
 	List(ctx context.Context, f InvoiceFilter, offset, limit int) ([]model.Invoice, int64, error)
@@ -52,13 +55,23 @@ type InvoiceRepository interface {
 	MarkExpired(ctx context.Context, now time.Time) (int64, error)
 }
 
+// PaymentIntentFilter is a filter applied to payment intent listing.
+type PaymentIntentFilter struct {
+	InvoiceID *uuid.UUID
+	Status    *constant.PaymentIntentStatus
+}
+
 // PaymentIntentRepository abstracts payment intent persistence.
 type PaymentIntentRepository interface {
 	Create(ctx context.Context, p *model.PaymentIntent) error
 	FindByID(ctx context.Context, id uuid.UUID) (*model.PaymentIntent, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, from, to constant.PaymentIntentStatus, processedAt *time.Time) error
-	List(ctx context.Context, invoiceID *uuid.UUID, offset, limit int) ([]model.PaymentIntent, int64, error)
+	List(ctx context.Context, f PaymentIntentFilter, offset, limit int) ([]model.PaymentIntent, int64, error)
 	FindLatestSuccessByInvoice(ctx context.Context, invoiceID uuid.UUID) (*model.PaymentIntent, error)
+	// FailPendingForExpiredInvoices settles PENDING intents whose invoice has since
+	// been EXPIRED, so they do not linger in a state they can never leave. Returns
+	// affected rows.
+	FailPendingForExpiredInvoices(ctx context.Context, now time.Time) (int64, error)
 }
 
 // RefreshTokenRepository abstracts refresh-token persistence.
@@ -76,6 +89,10 @@ type RefundRepository interface {
 	UpdateStatus(ctx context.Context, id uuid.UUID, from, to constant.RefundStatus, processedAt *time.Time) error
 	ListByMerchant(ctx context.Context, merchantID uuid.UUID, offset, limit int) ([]model.Refund, int64, error)
 	List(ctx context.Context, offset, limit int) ([]model.Refund, int64, error)
+	// SumOutstandingByInvoice totals refunds for an invoice that are either already
+	// settled (SUCCESS) or still in flight (REQUESTED/APPROVED). REJECTED and FAILED
+	// release their reservation and are excluded.
+	SumOutstandingByInvoice(ctx context.Context, invoiceID uuid.UUID) (int64, error)
 }
 
 // DashboardFilter for admin dashboard queries.

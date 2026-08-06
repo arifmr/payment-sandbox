@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,7 +33,7 @@ func (r *paymentIntentRepo) Create(ctx context.Context, p *model.PaymentIntent) 
 		p.ID, p.InvoiceID, p.Method, p.Status, p.Amount,
 		uuidPtrToNullString(p.PayerUserID), p.CreatedAt, timePtrToNullTime(p.ProcessedAt),
 	)
-	return err
+	return mapWriteError(err)
 }
 
 func (r *paymentIntentRepo) FindByID(ctx context.Context, id uuid.UUID) (*model.PaymentIntent, error) {
@@ -61,14 +62,22 @@ func (r *paymentIntentRepo) UpdateStatus(ctx context.Context, id uuid.UUID, from
 	return nil
 }
 
-func (r *paymentIntentRepo) List(ctx context.Context, invoiceID *uuid.UUID, offset, limit int) ([]model.PaymentIntent, int64, error) {
+func (r *paymentIntentRepo) List(ctx context.Context, f PaymentIntentFilter, offset, limit int) ([]model.PaymentIntent, int64, error) {
 	q := transaction.FromCtx(ctx, r.db)
 
-	whereClause := ""
+	conds := []string{}
 	args := []any{}
-	if invoiceID != nil {
-		whereClause = "WHERE invoice_id = $1"
-		args = append(args, *invoiceID)
+	if f.InvoiceID != nil {
+		args = append(args, *f.InvoiceID)
+		conds = append(conds, "invoice_id = $"+itoa(len(args)))
+	}
+	if f.Status != nil {
+		args = append(args, *f.Status)
+		conds = append(conds, "status = $"+itoa(len(args)))
+	}
+	whereClause := ""
+	if len(conds) > 0 {
+		whereClause = "WHERE " + strings.Join(conds, " AND ")
 	}
 
 	var total int64
@@ -112,6 +121,26 @@ func (r *paymentIntentRepo) FindLatestSuccessByInvoice(ctx context.Context, invo
 		invoiceID, constant.PaymentSuccess,
 	)
 	return scanPaymentIntent(row)
+}
+
+// FailPendingForExpiredInvoices is a single set-based UPDATE rather than a query-then-loop,
+// keeping it clear of the N+1 pattern SRS §5.1 rules out.
+func (r *paymentIntentRepo) FailPendingForExpiredInvoices(ctx context.Context, now time.Time) (int64, error) {
+	res, err := transaction.FromCtx(ctx, r.db).ExecContext(ctx, `
+		UPDATE payment_intents
+		SET status = $1, processed_at = $2
+		WHERE status = $3
+		  AND EXISTS (
+		      SELECT 1 FROM invoices
+		      WHERE invoices.id = payment_intents.invoice_id
+		        AND invoices.status = $4
+		  )`,
+		constant.PaymentFailed, now, constant.PaymentPending, constant.InvoiceExpired,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 func scanPaymentIntent(row *sql.Row) (*model.PaymentIntent, error) {

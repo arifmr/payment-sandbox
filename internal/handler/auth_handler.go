@@ -2,18 +2,31 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dboarif/payment-sandbox/internal/middleware"
 	"github.com/dboarif/payment-sandbox/internal/model"
+	"github.com/dboarif/payment-sandbox/internal/pkg/ratelimit"
 	"github.com/dboarif/payment-sandbox/internal/service"
 )
 
 type AuthHandler struct {
 	auth service.AuthService
+	// loginLimiter throttles login attempts per email address, complementing the
+	// per-IP limiter on the route. The two close different attacks: per-IP stops one
+	// host trying many accounts, per-email stops a distributed botnet grinding a
+	// single account. May be nil, in which case no per-account limit applies.
+	loginLimiter *ratelimit.Limiter
 }
 
-func NewAuthHandler(a service.AuthService) *AuthHandler { return &AuthHandler{auth: a} }
+// NewAuthHandler wires the login limiter here rather than as middleware because the key
+// is the email address, which only exists after the request body has been bound —
+// middleware would have to read and rewind the body to see it.
+func NewAuthHandler(a service.AuthService, loginLimiter *ratelimit.Limiter) *AuthHandler {
+	return &AuthHandler{auth: a, loginLimiter: loginLimiter}
+}
 
 func toLoginResponse(p *service.TokenPair) model.LoginResponse {
 	return model.LoginResponse{
@@ -67,6 +80,17 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		c.Error(badRequest(err))
 		return
 	}
+
+	// Normalised so "USER@x.com" and "user@x.com" share one bucket — otherwise case
+	// variation alone would multiply an attacker's allowance.
+	if h.loginLimiter != nil && h.loginLimiter.Enabled() {
+		key := strings.ToLower(strings.TrimSpace(req.Email))
+		if !h.loginLimiter.Allow(key) {
+			middleware.RateLimited(c, h.loginLimiter, key)
+			return
+		}
+	}
+
 	pair, err := h.auth.Login(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
 		c.Error(err)

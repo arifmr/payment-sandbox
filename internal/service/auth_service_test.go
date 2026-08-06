@@ -19,8 +19,8 @@ import (
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-func newTestHasher() *hash.Hasher   { return hash.New(bcrypt.MinCost) }
-func newTestJWT() *pkgjwt.Manager   { return pkgjwt.New("test-secret", time.Minute) }
+func newTestHasher() *hash.Hasher { return hash.New(bcrypt.MinCost) }
+func newTestJWT() *pkgjwt.Manager { return pkgjwt.New("test-secret", time.Minute) }
 
 func newTestAuthSvc(u repository.UserRepository, w repository.WalletRepository, rt repository.RefreshTokenRepository) AuthService {
 	return NewAuthService(u, w, rt, newTestHasher(), newTestJWT(), noopUoW{}, 7*24*time.Hour)
@@ -64,7 +64,7 @@ func (r *authUserRepo) FindByID(_ context.Context, id uuid.UUID) (*model.User, e
 
 type authWalletRepo struct{}
 
-func (authWalletRepo) Create(context.Context, *model.Wallet) error              { return nil }
+func (authWalletRepo) Create(context.Context, *model.Wallet) error { return nil }
 func (authWalletRepo) FindByMerchantID(context.Context, uuid.UUID) (*model.Wallet, error) {
 	return nil, apperror.ErrNotFound
 }
@@ -114,8 +114,8 @@ func (r *authRefreshRepo) RevokeAllForUser(_ context.Context, userID uuid.UUID, 
 }
 
 // interface guards
-var _ repository.UserRepository         = (*authUserRepo)(nil)
-var _ repository.WalletRepository       = (authWalletRepo{})
+var _ repository.UserRepository = (*authUserRepo)(nil)
+var _ repository.WalletRepository = (authWalletRepo{})
 var _ repository.RefreshTokenRepository = (*authRefreshRepo)(nil)
 
 // ── Register ─────────────────────────────────────────────────────────────────

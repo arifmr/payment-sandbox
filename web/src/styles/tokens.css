@@ -1,0 +1,144 @@
+/*
+ * Design tokens.
+ *
+ * Every colour, space and radius used by a component comes from here. Components never
+ * hard-code a hex value, so light/dark and any future theming is one file to change
+ * rather than a search through the codebase.
+ *
+ * Semantic naming (--surface, --text-muted) rather than literal (--gray-100) is what makes
+ * the dark theme a token swap instead of a rewrite: a component asks for "the surface
+ * colour", not "light grey".
+ */
+
+:root {
+  /* Brand + status hues */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: #eff6ff;
+  --accent-contrast: #ffffff;
+
+  --success: #15803d;
+  --success-soft: #f0fdf4;
+  --warning: #b45309;
+  --warning-soft: #fffbeb;
+  --danger: #b91c1c;
+  --danger-soft: #fef2f2;
+  --neutral: #475569;
+  --neutral-soft: #f1f5f9;
+
+  /* Surfaces and text */
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f1f5f9;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-inverse: #f8fafc;
+
+  /* Spacing — a 4px scale keeps rhythm consistent without per-component judgement */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-full: 999px;
+
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
+  --shadow: 0 4px 12px rgb(15 23 42 / 0.08);
+  --shadow-lg: 0 12px 32px rgb(15 23 42 / 0.12);
+
+  --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+
+  --sidebar-width: 240px;
+  --topbar-height: 60px;
+  --content-max: 1180px;
+
+  --transition: 140ms ease;
+}
+
+/*
+ * Dark theme. Driven by the OS preference, and overridable by an explicit choice via
+ * [data-theme] — the manual toggle must win in both directions, so both selectors exist.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --accent: #60a5fa;
+    --accent-hover: #93c5fd;
+    --accent-soft: #172554;
+    --accent-contrast: #0b1120;
+
+    --success: #4ade80;
+    --success-soft: #052e16;
+    --warning: #fbbf24;
+    --warning-soft: #3f2d0a;
+    --danger: #f87171;
+    --danger-soft: #451414;
+    --neutral: #94a3b8;
+    --neutral-soft: #1e293b;
+
+    --bg: #0b1120;
+    --surface: #111827;
+    --surface-raised: #172033;
+    --surface-sunken: #0f172a;
+    --border: #1f2b3f;
+    --border-strong: #334155;
+
+    --text: #e8edf5;
+    --text-muted: #94a3b8;
+    --text-inverse: #0b1120;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow: 0 4px 12px rgb(0 0 0 / 0.45);
+    --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.55);
+  }
+}
+
+:root[data-theme='dark'] {
+  --accent: #60a5fa;
+  --accent-hover: #93c5fd;
+  --accent-soft: #172554;
+  --accent-contrast: #0b1120;
+
+  --success: #4ade80;
+  --success-soft: #052e16;
+  --warning: #fbbf24;
+  --warning-soft: #3f2d0a;
+  --danger: #f87171;
+  --danger-soft: #451414;
+  --neutral: #94a3b8;
+  --neutral-soft: #1e293b;
+
+  --bg: #0b1120;
+  --surface: #111827;
+  --surface-raised: #172033;
+  --surface-sunken: #0f172a;
+  --border: #1f2b3f;
+  --border-strong: #334155;
+
+  --text: #e8edf5;
+  --text-muted: #94a3b8;
+  --text-inverse: #0b1120;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow: 0 4px 12px rgb(0 0 0 / 0.45);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.55);
+}

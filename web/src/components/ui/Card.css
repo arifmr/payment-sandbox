@@ -1,0 +1,94 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.card-head-text {
+  min-width: 0;
+}
+
+.card-title {
+  font-size: var(--text-lg);
+}
+
+.card-desc {
+  margin-top: 0.15rem;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.card-body {
+  padding: var(--space-5);
+}
+
+.card-body-flush {
+  padding: 0;
+}
+
+@media (max-width: 640px) {
+  .card-head,
+  .card-body {
+    padding: var(--space-4);
+  }
+}
+
+/* ── metric ─────────────────────────────────────────────────────────────────── */
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.metric-label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.metric-value {
+  font-size: var(--text-2xl);
+  line-height: 1.2;
+}
+
+.metric-hint {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.metric-success .metric-value {
+  color: var(--success);
+}
+.metric-danger .metric-value {
+  color: var(--danger);
+}
+.metric-warning .metric-value {
+  color: var(--warning);
+}

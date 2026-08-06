@@ -36,6 +36,8 @@ import (
 	"github.com/dboarif/payment-sandbox/internal/pkg/hash"
 	"github.com/dboarif/payment-sandbox/internal/pkg/jwt"
 	"github.com/dboarif/payment-sandbox/internal/pkg/logger"
+	"github.com/dboarif/payment-sandbox/internal/pkg/metrics"
+	"github.com/dboarif/payment-sandbox/internal/pkg/ratelimit"
 	"github.com/dboarif/payment-sandbox/internal/repository"
 	"github.com/dboarif/payment-sandbox/internal/service"
 	"github.com/dboarif/payment-sandbox/internal/transaction"
@@ -93,15 +95,22 @@ func main() {
 	refundRepo := repository.NewRefundRepo(db)
 	dashboardRepo := repository.NewDashboardRepo(db)
 	refreshRepo := repository.NewRefreshTokenRepo(db)
+	locker := repository.NewAdvisoryLocker(db)
 
 	// Foundations
 	uow := transaction.NewUoW(db)
 	jwtMgr := jwt.New(cfg.JWTSecret, cfg.JWTAccessTTL)
+	metricsReg := metrics.NewRegistry()
+
+	// Rate limiters. Two dimensions on purpose: per-IP stops one host trying many
+	// accounts, per-email stops a distributed attempt on a single account.
+	authIPLimiter := ratelimit.New(cfg.AuthRateLimitPerMinute, time.Minute, cfg.AuthRateLimitBurst)
+	loginLimiter := ratelimit.New(cfg.LoginRateLimitPerMinute, time.Minute, cfg.LoginRateLimitBurst)
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, walletRepo, refreshRepo, hasher, jwtMgr, uow, cfg.JWTRefreshTTL)
 	walletSvc := service.NewWalletService(topupRepo, walletRepo, uow)
-	invSvc := service.NewInvoiceService(invRepo)
+	invSvc := service.NewInvoiceService(invRepo, piRepo, locker, uow)
 	paySvc := service.NewPaymentService(invRepo, piRepo, walletRepo, uow)
 	refundSvc := service.NewRefundService(refundRepo, invRepo, piRepo, walletRepo, uow)
 	adminSvc := service.NewAdminService(dashboardRepo)
@@ -112,15 +121,20 @@ func main() {
 
 	// Handlers
 	hs := &handler.Handlers{
-		Auth:    handler.NewAuthHandler(authSvc),
+		Auth:    handler.NewAuthHandler(authSvc, loginLimiter),
 		Wallet:  handler.NewWalletHandler(walletSvc),
 		Invoice: handler.NewInvoiceHandler(invSvc, "/api/v1/pay"),
 		Payment: handler.NewPaymentHandler(paySvc, invSvc, userRepo),
 		Refund:  handler.NewRefundHandler(refundSvc),
 		Admin:   handler.NewAdminHandler(adminSvc),
+		Health:  handler.NewHealthHandler(db, log),
 	}
 
-	r := handler.NewRouter(hs, jwtMgr, log)
+	r := handler.NewRouter(hs, jwtMgr, log, handler.RouterDeps{
+		AuthIPLimiter: authIPLimiter,
+		Metrics:       metricsReg,
+		ExposeMetrics: cfg.MetricsEnabled,
+	})
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.HTTPPort,
@@ -155,13 +169,22 @@ func runExpirySweeper(ctx context.Context, log *slog.Logger, invSvc service.Invo
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			n, err := invSvc.ExpireDue(ctx)
+			res, err := invSvc.ExpireDue(ctx)
 			if err != nil {
 				log.Warn("expiry sweep failed", "err", err)
 				continue
 			}
-			if n > 0 {
-				log.Info("invoices expired", "count", n)
+			if res.Skipped {
+				// Another replica holds the advisory lock. Expected in a multi-instance
+				// deployment, so logged at debug rather than as a problem.
+				log.Debug("expiry sweep skipped: another instance is sweeping")
+				continue
+			}
+			if res.InvoicesExpired > 0 || res.IntentsFailed > 0 {
+				log.Info("expiry sweep completed",
+					"invoices_expired", res.InvoicesExpired,
+					"intents_failed", res.IntentsFailed,
+				)
 			}
 		}
 	}

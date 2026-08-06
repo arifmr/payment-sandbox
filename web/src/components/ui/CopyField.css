@@ -1,0 +1,31 @@
+.copy-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.copy-label {
+  font-size: var(--text-sm);
+  font-weight: 550;
+}
+
+.copy-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.copy-input {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  background: var(--surface-sunken);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.copy-error {
+  color: var(--danger);
+}

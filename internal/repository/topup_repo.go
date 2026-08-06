@@ -31,7 +31,7 @@ func (r *topupRepo) Create(ctx context.Context, t *model.Topup) error {
 		VALUES ($1, $2, $3, $4, $5, $6)`,
 		t.ID, t.MerchantID, t.Amount, t.Status, t.CreatedAt, timePtrToNullTime(t.ProcessedAt),
 	)
-	return err
+	return mapWriteError(err)
 }
 
 func (r *topupRepo) FindByID(ctx context.Context, id uuid.UUID) (*model.Topup, error) {

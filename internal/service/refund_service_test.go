@@ -26,7 +26,9 @@ func (noopUoW) Do(ctx context.Context, fn func(ctx context.Context) error) error
 
 type mockRefundRepo struct{ store map[uuid.UUID]*model.Refund }
 
-func newMockRefundRepo() *mockRefundRepo { return &mockRefundRepo{store: map[uuid.UUID]*model.Refund{}} }
+func newMockRefundRepo() *mockRefundRepo {
+	return &mockRefundRepo{store: map[uuid.UUID]*model.Refund{}}
+}
 
 func (m *mockRefundRepo) Create(_ context.Context, r *model.Refund) error {
 	r.CreatedAt = time.Now()
@@ -59,6 +61,19 @@ func (m *mockRefundRepo) ListByMerchant(context.Context, uuid.UUID, int, int) ([
 }
 func (m *mockRefundRepo) List(context.Context, int, int) ([]model.Refund, int64, error) {
 	return nil, 0, nil
+}
+func (m *mockRefundRepo) SumOutstandingByInvoice(_ context.Context, invoiceID uuid.UUID) (int64, error) {
+	var total int64
+	for _, r := range m.store {
+		if r.InvoiceID != invoiceID {
+			continue
+		}
+		switch r.Status {
+		case constant.RefundRequested, constant.RefundApproved, constant.RefundSuccess:
+			total += r.Amount
+		}
+	}
+	return total, nil
 }
 
 type mockWalletRepo struct {

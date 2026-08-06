@@ -37,7 +37,7 @@ func (r *refundRepo) Create(ctx context.Context, rf *model.Refund) error {
 		rf.ID, rf.InvoiceID, rf.PaymentIntentID, rf.MerchantID, rf.Amount, rf.Reason,
 		rf.Status, rf.CreatedAt, rf.UpdatedAt, timePtrToNullTime(rf.ProcessedAt),
 	)
-	return err
+	return mapWriteError(err)
 }
 
 func (r *refundRepo) FindByID(ctx context.Context, id uuid.UUID) (*model.Refund, error) {
@@ -72,6 +72,24 @@ func (r *refundRepo) ListByMerchant(ctx context.Context, merchantID uuid.UUID, o
 
 func (r *refundRepo) List(ctx context.Context, offset, limit int) ([]model.Refund, int64, error) {
 	return r.list(ctx, "", nil, offset, limit)
+}
+
+// SumOutstandingByInvoice totals refunds that still hold a claim on the invoice:
+// SUCCESS (already paid out) plus REQUESTED/APPROVED (in flight). REJECTED and
+// FAILED refunds are excluded because they release their reservation.
+func (r *refundRepo) SumOutstandingByInvoice(ctx context.Context, invoiceID uuid.UUID) (int64, error) {
+	var total int64
+	err := transaction.FromCtx(ctx, r.db).QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(amount), 0) FROM refunds
+		WHERE invoice_id = $1 AND status = ANY($2)`,
+		invoiceID,
+		[]string{
+			string(constant.RefundRequested),
+			string(constant.RefundApproved),
+			string(constant.RefundSuccess),
+		},
+	).Scan(&total)
+	return total, err
 }
 
 func (r *refundRepo) list(ctx context.Context, where string, args []any, offset, limit int) ([]model.Refund, int64, error) {

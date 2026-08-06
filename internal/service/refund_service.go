@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,11 +25,23 @@ const (
 )
 
 func (a RefundAction) Valid() bool {
+	return a.target() != ""
+}
+
+// target maps an admin action to the refund status it drives to. An unknown
+// action maps to the empty status, which the FSM will always reject.
+func (a RefundAction) target() constant.RefundStatus {
 	switch a {
-	case RefundActionApprove, RefundActionReject, RefundActionProcess, RefundActionFail:
-		return true
+	case RefundActionApprove:
+		return constant.RefundApproved
+	case RefundActionReject:
+		return constant.RefundRejected
+	case RefundActionProcess:
+		return constant.RefundSuccess
+	case RefundActionFail:
+		return constant.RefundFailed
 	}
-	return false
+	return ""
 }
 
 type RefundService interface {
@@ -57,40 +70,65 @@ func NewRefundService(
 	return &refundService{refunds: r, invoices: inv, intents: pi, wallets: w, uow: uow}
 }
 
+// Request opens a refund for a PAID invoice. The whole check-then-insert runs in one
+// transaction with the invoice row locked, so concurrent requests cannot each observe
+// the same remaining balance and collectively over-refund the invoice.
 func (s *refundService) Request(ctx context.Context, merchantID, invoiceID uuid.UUID, amount int64, reason string) (*model.Refund, error) {
 	if amount <= 0 {
 		return nil, apperror.ErrInvalidAmount
 	}
-	inv, err := s.invoices.FindByID(ctx, invoiceID)
+
+	var out *model.Refund
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
+		inv, err := s.invoices.FindByIDForUpdate(ctx, invoiceID)
+		if err != nil {
+			return err
+		}
+		if inv.MerchantID != merchantID {
+			return apperror.ErrForbidden
+		}
+		if inv.Status != constant.InvoicePaid {
+			return apperror.New(apperror.KindUnprocessable, "INVOICE_NOT_PAID", "only PAID invoices can be refunded")
+		}
+
+		// Cap the total across every refund still holding a claim on this invoice,
+		// not just this single request.
+		outstanding, err := s.refunds.SumOutstandingByInvoice(ctx, inv.ID)
+		if err != nil {
+			return err
+		}
+		if outstanding+amount > inv.Amount {
+			return apperror.New(apperror.KindUnprocessable, "REFUND_EXCEEDS_INVOICE",
+				"refund amount exceeds the invoice's remaining refundable balance")
+		}
+
+		pi, err := s.intents.FindLatestSuccessByInvoice(ctx, inv.ID)
+		if err != nil {
+			if errors.Is(err, apperror.ErrNotFound) {
+				return apperror.New(apperror.KindUnprocessable, "NO_SUCCESSFUL_PAYMENT",
+					"invoice has no successful payment to refund")
+			}
+			return err
+		}
+		rf := &model.Refund{
+			ID:              uuid.New(),
+			InvoiceID:       inv.ID,
+			PaymentIntentID: pi.ID,
+			MerchantID:      merchantID,
+			Amount:          amount,
+			Reason:          reason,
+			Status:          constant.RefundRequested,
+		}
+		if err := s.refunds.Create(ctx, rf); err != nil {
+			return err
+		}
+		out = rf
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	if inv.MerchantID != merchantID {
-		return nil, apperror.ErrForbidden
-	}
-	if inv.Status != constant.InvoicePaid {
-		return nil, apperror.New(apperror.KindUnprocessable, "INVOICE_NOT_PAID", "only PAID invoices can be refunded")
-	}
-	if amount > inv.Amount {
-		return nil, apperror.New(apperror.KindBadRequest, "REFUND_EXCEEDS_INVOICE", "refund amount exceeds invoice amount")
-	}
-	pi, err := s.intents.FindLatestSuccessByInvoice(ctx, inv.ID)
-	if err != nil {
-		return nil, err
-	}
-	rf := &model.Refund{
-		ID:              uuid.New(),
-		InvoiceID:       inv.ID,
-		PaymentIntentID: pi.ID,
-		MerchantID:      merchantID,
-		Amount:          amount,
-		Reason:          reason,
-		Status:          constant.RefundRequested,
-	}
-	if err := s.refunds.Create(ctx, rf); err != nil {
-		return nil, err
-	}
-	return rf, nil
+	return out, nil
 }
 
 // AdminAction routes a single admin action through the refund state machine.
@@ -112,46 +150,29 @@ func (s *refundService) AdminAction(ctx context.Context, refundID uuid.UUID, act
 		}
 		now := time.Now().UTC()
 
-		switch action {
-		case RefundActionApprove:
-			if rf.Status != constant.RefundRequested {
-				return apperror.ErrInvalidState
-			}
-			if err := s.refunds.UpdateStatus(ctx, refundID, constant.RefundRequested, constant.RefundApproved, nil); err != nil {
-				return err
-			}
-			rf.Status = constant.RefundApproved
-		case RefundActionReject:
-			if rf.Status != constant.RefundRequested {
-				return apperror.ErrInvalidState
-			}
-			if err := s.refunds.UpdateStatus(ctx, refundID, constant.RefundRequested, constant.RefundRejected, &now); err != nil {
-				return err
-			}
-			rf.Status = constant.RefundRejected
-			rf.ProcessedAt = &now
-		case RefundActionProcess:
-			if rf.Status != constant.RefundApproved {
-				return apperror.ErrInvalidState
-			}
-			if err := s.refunds.UpdateStatus(ctx, refundID, constant.RefundApproved, constant.RefundSuccess, &now); err != nil {
-				return err
-			}
+		target := action.target()
+		if !constant.RefundFSM.Can(rf.Status, target) {
+			return apperror.ErrInvalidState
+		}
+
+		// APPROVE is the only non-terminal transition, so it leaves processed_at unset.
+		var processedAt *time.Time
+		if target != constant.RefundApproved {
+			processedAt = &now
+		}
+
+		if err := s.refunds.UpdateStatus(ctx, refundID, rf.Status, target, processedAt); err != nil {
+			return err
+		}
+		// SUCCESS is the only action that moves money.
+		if target == constant.RefundSuccess {
 			if err := s.wallets.AddBalance(ctx, rf.MerchantID, -rf.Amount); err != nil {
 				return err
 			}
-			rf.Status = constant.RefundSuccess
-			rf.ProcessedAt = &now
-		case RefundActionFail:
-			if rf.Status != constant.RefundApproved {
-				return apperror.ErrInvalidState
-			}
-			if err := s.refunds.UpdateStatus(ctx, refundID, constant.RefundApproved, constant.RefundFailed, &now); err != nil {
-				return err
-			}
-			rf.Status = constant.RefundFailed
-			rf.ProcessedAt = &now
 		}
+
+		rf.Status = target
+		rf.ProcessedAt = processedAt
 		out = rf
 		return nil
 	})

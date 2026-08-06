@@ -1,0 +1,29 @@
+.dlist {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+
+.dlist-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.dlist-wide {
+  grid-column: 1 / -1;
+}
+
+.dlist-label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.dlist-value {
+  /* Long values (UUIDs, tokens) must wrap instead of forcing the page wider. */
+  overflow-wrap: anywhere;
+}
